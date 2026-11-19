@@ -1,4 +1,4 @@
-# certified-corruption-budget
+# Certified Corruption Budget
 
 Attach a **certified corruption budget** to leaderboard claims.
 

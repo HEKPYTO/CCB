@@ -17,8 +17,8 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/HEKPYTO/CERTIFIED-CORRUPTION-BUDGET"
-Repository = "https://github.com/HEKPYTO/CERTIFIED-CORRUPTION-BUDGET"
+Homepage = "https://github.com/HEKPYTO/CCB"
+Repository = "https://github.com/HEKPYTO/CCB"
 
 [project.scripts]
 ccb = "ccb.cli:main"
