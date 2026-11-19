@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["numpy>=1.26,<3"]
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "zoonyanapat" }]
+authors = [{ name = "HEKPYTO" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
