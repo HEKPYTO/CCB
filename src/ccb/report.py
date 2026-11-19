@@ -1,3 +1,4 @@
+import html
 import json
 
 from .certificates import Certificate
@@ -128,3 +129,133 @@ def leaderboard_text(data: dict) -> str:
         "",
     ]
     return "\n".join([*meta, *rows])
+
+
+_METHOD_LABELS = {
+    "wald": "Wald",
+    "naive": "Undeflated",
+    "per_step": "Per-step",
+    "insertion": "Insertion",
+    "replacement": "Replacement",
+}
+
+_CSS = """
+body { font-family: Georgia, serif; margin: 2rem auto; max-width: 760px; color: #1b1b1b; }
+h1 { font-size: 1.5rem; margin-bottom: 0.2rem; }
+h2 { font-size: 1.1rem; margin-top: 2rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { border-bottom: 1px solid #d8d8d8; padding: 0.35rem 0.5rem; text-align: left; }
+code { font-family: monospace; font-size: 0.8rem; }
+.muted { color: #666; font-size: 0.85rem; }
+"""
+
+
+def _rate_table(data: dict) -> str:
+    budgets = data["budgets"]
+    header = "".join(f"<th>B={budget}</th>" for budget in budgets)
+    rows = []
+    for method, values in data["rates"].items():
+        cells = "".join(f"<td>{values[str(budget)]:.3f}</td>" for budget in budgets)
+        rows.append(f"<tr><td>{_METHOD_LABELS[method]}</td>{cells}</tr>")
+    return (
+        "<table><thead><tr><th>method</th>"
+        + header
+        + "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def _rate_chart(data: dict) -> str:
+    budget = data["budgets"][-1]
+    bars = []
+    for index, (method, values) in enumerate(data["rates"].items()):
+        rate = values[str(budget)]
+        y = 8 + index * 26
+        width = max(round(rate * 400), 1)
+        bars.append(
+            f'<rect x="120" y="{y}" width="{width}" height="18" fill="#1f6feb"/>'
+        )
+        bars.append(
+            f'<text x="4" y="{y + 13}" font-size="12">'
+            f"{html.escape(_METHOD_LABELS[method])}</text>"
+        )
+        bars.append(
+            f'<text x="{128 + width}" y="{y + 13}" font-size="12">{rate:.3f}</text>'
+        )
+    height = 8 + len(data["rates"]) * 26
+    return (
+        f'<svg width="560" height="{height}" role="img" '
+        f'aria-label="False-statement rates at B={budget}">' + "".join(bars) + "</svg>"
+    )
+
+
+def demo_html(streams, results, replay_data: dict, digest: str) -> str:
+    records = sum(values.size for values in streams.values())
+    certified = sum(1 for result in results if result.tolerance >= 0)
+    rows = []
+    for result in results:
+        pair = f"{html.escape(result.model_a)} &gt; {html.escape(result.model_b)}"
+        ratio = (
+            f"{result.tolerance / result.n:.3f}"
+            if result.tolerance >= 0 and result.n
+            else "n/a"
+        )
+        rows.append(
+            f"<tr><td>{pair}</td><td>{result.n}</td>"
+            f"<td>{result.tolerance}</td><td>{ratio}</td>"
+            f"<td>{result.certified_at}</td></tr>"
+        )
+    parts = [
+        "<!doctype html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
+        "<title>Certified corruption budgets</title>",
+        f"<style>{_CSS}</style>",
+        "</head>",
+        "<body>",
+        "<h1>Certified corruption budgets</h1>",
+        (
+            '<p class="muted">Hamed Khosravi and Xiaoming Huo, '
+            "<em>Certified Corruption Budgets: Anytime-Valid Leaderboard "
+            "Claims under Adaptive Rigging</em>, arXiv:2610.10597.</p>"
+        ),
+        (
+            f"<p>alpha {results[0].alpha:g} &middot; cost {results[0].cost} "
+            f"&middot; method {results[0].method}</p>"
+        ),
+        f'<p class="muted">input sha256 <code>{digest}</code></p>',
+        "<h2>Summary</h2>",
+        (
+            f"<p>{len(streams)} pairs &middot; {records} records &middot; "
+            f"{certified} certified</p>"
+        ),
+        "<h2>Pairs</h2>",
+        (
+            "<table><thead><tr><th>pair</th><th>n</th><th>B_hat</th>"
+            "<th>B_hat/n</th><th>certified_at</th></tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table>"
+        ),
+        f"<h2>Replay: {html.escape(replay_data['attack'])} attack on a simulated null leaderboard</h2>",
+        (
+            f'<p class="muted">{replay_data["replays"]} replays, seed '
+            f"{replay_data['seed']}, {replay_data['records']} fair-coin records. "
+            "This panel demonstrates the method; it is not a claim about the "
+            "input data.</p>"
+        ),
+        _rate_table(replay_data),
+        (
+            f'<p class="muted">False-statement rates at '
+            f"B={replay_data['budgets'][-1]}.</p>"
+        ),
+        f"<p>{_rate_chart(replay_data)}</p>",
+        (
+            '<p class="muted">A certificate is not proof of truth; it is '
+            "robustness to corrupted records.</p>"
+        ),
+        "</body>",
+        "</html>",
+    ]
+    return "\n".join(parts)

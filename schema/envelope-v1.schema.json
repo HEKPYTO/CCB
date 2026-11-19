@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ccb.local/schema/envelope-v1.schema.json",
+  "title": "ccb/v1 envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "command", "data", "error"],
+  "properties": {
+    "schema": {"const": "ccb/v1"},
+    "command": {"enum": ["certify", "replay", "leaderboard", "demo"]},
+    "data": {"type": ["object", "null"]},
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

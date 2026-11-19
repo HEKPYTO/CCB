@@ -1,6 +1,9 @@
 import argparse
+import hashlib
 import sys
 from pathlib import Path
+
+import numpy as np
 
 from . import __version__
 from .certificates import certify_edge, certify_lead
@@ -11,6 +14,7 @@ from .replay import DEFAULT_BUDGETS, replay
 from .report import (
     certify_payload,
     certify_text,
+    demo_html,
     envelope,
     leaderboard_payload,
     leaderboard_text,
@@ -94,6 +98,13 @@ def _parser() -> argparse.ArgumentParser:
     board.add_argument("--json", action="store_true")
     board.add_argument("--out")
     board.add_argument("--force", action="store_true")
+
+    demo = sub.add_parser("demo", help="write a self-contained HTML report")
+    demo.add_argument("--input", required=True)
+    demo.add_argument("--format", choices=("jsonl", "csv"))
+    demo.add_argument("--out", default="demo.html")
+    demo.add_argument("--seed", type=_non_negative, default=0)
+    demo.add_argument("--force", action="store_true")
     return parser
 
 
@@ -161,6 +172,26 @@ def _leaderboard_command(args: argparse.Namespace) -> str:
     return envelope("leaderboard", payload) if args.json else leaderboard_text(payload)
 
 
+def _demo_command(args: argparse.Namespace) -> str:
+    path = Path(args.input)
+    records = load_records(path, args.format)
+    streams = pair_streams(records)
+    results = closed_test(streams)
+    horizon = min(values.size for values in streams.values())
+    null = (np.random.default_rng(args.seed).random(min(horizon, 1000)) < 0.5).astype(
+        float
+    )
+    simulation = replay(
+        null,
+        attack="flip",
+        budgets=DEFAULT_BUDGETS,
+        replays=100,
+        seed=args.seed,
+    ).to_dict()
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return demo_html(streams, results, simulation, digest)
+
+
 def _write(text: str, args: argparse.Namespace) -> None:
     if not args.out:
         print(text)
@@ -186,6 +217,7 @@ _COMMANDS = {
     "certify": _certify_command,
     "replay": _replay_command,
     "leaderboard": _leaderboard_command,
+    "demo": _demo_command,
 }
 
 
@@ -205,6 +237,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         _write(_COMMANDS[args.command](args), args)
+        if args.command == "demo":
+            print(f"wrote {args.out}")
     except CCBError as error:
         _fail(args, error)
         return 1

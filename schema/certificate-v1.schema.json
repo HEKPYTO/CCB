@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ccb.local/schema/certificate-v1.schema.json",
+  "title": "ccb/v1 certificate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim",
+    "cost",
+    "alpha",
+    "n",
+    "tolerance",
+    "certified_at",
+    "selection_variants"
+  ],
+  "properties": {
+    "claim": {"enum": ["edge", "lead"]},
+    "cost": {"enum": ["insertion", "replacement"]},
+    "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+    "n": {"type": "integer", "minimum": 0},
+    "tolerance": {"type": "integer", "minimum": -1},
+    "certified_at": {"type": "integer", "minimum": -1},
+    "selection_variants": {"type": "integer", "minimum": 1}
+  }
+}
