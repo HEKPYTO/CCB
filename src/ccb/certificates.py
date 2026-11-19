@@ -80,6 +80,17 @@ def _certificate(
     )
 
 
+def _normalized(
+    grid: Grid | None, alpha: float, cost: Cost, selection_variants: int
+) -> tuple[Grid, float, Cost, int]:
+    return (
+        grid if grid is not None else Grid.default(),
+        validated_alpha(alpha),
+        validated_cost(cost),
+        validated_variants(selection_variants),
+    )
+
+
 def certify_edge(
     outcomes: np.ndarray,
     *,
@@ -90,10 +101,7 @@ def certify_edge(
 ) -> Certificate:
     """Deflated capped betting, paper eq. (8)-(9), Theorem 5.1."""
     x = validated_outcomes(outcomes)
-    grid = grid if grid is not None else Grid.default()
-    alpha = validated_alpha(alpha)
-    cost = validated_cost(cost)
-    variants = validated_variants(selection_variants)
+    grid, alpha, cost, variants = _normalized(grid, alpha, cost, selection_variants)
     cost_vector = grid_costs(grid, cost)
     log_paths = np.vstack([log_wealth(x, float(lam)) for lam in grid.lams])
     return _certificate(
@@ -111,10 +119,7 @@ def certify_lead(
 ) -> Certificate:
     """Deflated exponential wealth, paper eq. (10), Theorem 5.7."""
     x = validated_outcomes(outcomes)
-    grid = grid if grid is not None else Grid.default()
-    alpha = validated_alpha(alpha)
-    cost = validated_cost(cost)
-    variants = validated_variants(selection_variants)
+    grid, alpha, cost, variants = _normalized(grid, alpha, cost, selection_variants)
     index = 0 if cost == "insertion" else 1
     cost_vector = np.array([exp_costs(float(lam))[index] for lam in grid.lams])
     log_paths = _paths(x, grid.lams, exponential=True)
@@ -134,10 +139,12 @@ class _StreamingCertificate:
         grid: Grid | None = None,
         selection_variants: int = 1,
     ):
-        self._grid = grid if grid is not None else Grid.default()
-        self._alpha = validated_alpha(alpha)
-        self._cost = validated_cost(cost)
-        self._variants = validated_variants(selection_variants)
+        (
+            self._grid,
+            self._alpha,
+            self._cost,
+            self._variants,
+        ) = _normalized(grid, alpha, cost, selection_variants)
         self._log_wealth = np.zeros(len(self._grid.lams))
         self._t = 0
         self._certified_at = -1
@@ -146,8 +153,15 @@ class _StreamingCertificate:
         x = float(validated_outcomes(outcome))
         self._log_wealth = self._log_wealth + self._log_step(x)
         self._t += 1
-        if self._certified_at < 0 and self.certificate().tolerance >= 0:
-            self._certified_at = self._t
+        if self._certified_at < 0:
+            live = log_phi(
+                self._log_wealth[:, None],
+                self._cost_vector(),
+                self._grid.weights,
+                0.0,
+            )
+            if live[0] >= threshold(self._alpha, self._variants):
+                self._certified_at = self._t
 
     def certificate(self) -> Certificate:
         certificate = _certificate(

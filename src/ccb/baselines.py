@@ -17,6 +17,16 @@ def wald_violation(observed, every: int = 50) -> np.ndarray:
     return mean - half_width > 0.5
 
 
+def undeflated_violation(
+    paths: np.ndarray, grid: Grid, alpha: float = 0.05
+) -> np.ndarray:
+    """Undeflated grid wealth above 1/alpha, from precomputed wealth paths."""
+    if not np.isfinite(alpha) or not 0.0 < alpha < 1.0:
+        raise CCBError("invalid_alpha", "alpha must be in (0, 1)")
+    live = log_phi(paths, np.zeros(len(grid.lams)), grid.weights, 0.0)
+    return live >= np.log(1.0 / alpha)
+
+
 def naive_violation(
     observed, grid: Grid | None = None, alpha: float = 0.05
 ) -> np.ndarray:
@@ -26,8 +36,7 @@ def naive_violation(
         raise CCBError("invalid_alpha", "alpha must be in (0, 1)")
     grid = grid if grid is not None else Grid.default()
     paths = np.vstack([log_wealth(values, float(lam)) for lam in grid.lams])
-    live = log_phi(paths, np.zeros(len(grid.lams)), grid.weights, 0.0)
-    return live >= np.log(1.0 / alpha)
+    return undeflated_violation(paths, grid, alpha)
 
 
 def per_step_violation(

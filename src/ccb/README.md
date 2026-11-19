@@ -13,7 +13,7 @@ Statistical core for certified corruption budgets.
 | `baselines.py` | Wald, undeflated betting, per-step robust |
 | `replay.py` | resampled false-statement replay, deterministic per seed |
 | `leaderboard.py` | closed testing and Bonferroni over a pair family |
-| `cli.py` | `ccb` entry point: `version` and `certify`; `V > 1` requires `--variant` |
+| `cli.py` | `ccb` entry point: `version`, `certify`, `replay`, `leaderboard`, `demo`; `V > 1` requires `--variant` |
 
 Formulas follow arXiv:2610.10597 eq. (5)–(10) and Theorems 5.1/5.7. Values are
 pinned against the reference implementation and `tests/golden/p70_1000_seed0.json`.

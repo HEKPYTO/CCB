@@ -1,7 +1,20 @@
 import numpy as np
 import pytest
 
-from ccb.core import Grid, budget_path, costs, grid_costs, log_phi, log_wealth
+from ccb.core import (
+    Grid,
+    budget_path,
+    costs,
+    grid_costs,
+    log_phi,
+    log_wealth,
+    selection_correction,
+)
+
+
+def test_selection_correction_matches_log_v():
+    assert selection_correction(1) == 0.0
+    assert selection_correction(27) == pytest.approx(np.log(27.0))
 
 
 def test_costs_match_closed_form():

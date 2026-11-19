@@ -46,3 +46,11 @@ def test_out_path_is_a_directory(tmp_path, capsys):
     ]
     assert main(argv) == 1
     assert "io_error" in capsys.readouterr().err
+
+
+def test_csv_oversized_field_is_typed(tmp_path):
+    path = tmp_path / "wide.csv"
+    path.write_text('model_a,model_b,outcome\n"' + "x" * 200_000 + '",b,1\n')
+    with pytest.raises(CCBError) as excinfo:
+        load_records(path)
+    assert excinfo.value.code == "parse_error"

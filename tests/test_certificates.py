@@ -123,3 +123,25 @@ def test_non_positive_selection_variants(variants):
 def test_non_integer_selection_variants(variants):
     with pytest.raises(TypeError):
         certify_edge(P70, selection_variants=variants)
+
+
+@pytest.mark.slow
+def test_lead_validity():
+    rng = np.random.default_rng(0)
+    null = (rng.random(5000) < 0.5).astype(float)
+    hits = 0
+    for _ in range(5000):
+        sample = rng.choice(null, size=null.size, replace=True)
+        hits += certify_lead(sample).tolerance >= 0
+    assert hits / 5000 <= 0.06
+
+
+@pytest.mark.slow
+def test_alpha_001():
+    rng = np.random.default_rng(0)
+    null = (rng.random(1000) < 0.5).astype(float)
+    hits = 0
+    for _ in range(5000):
+        sample = rng.choice(null, size=null.size, replace=True)
+        hits += certify_edge(sample, alpha=0.01).tolerance >= 0
+    assert hits / 5000 <= 0.016

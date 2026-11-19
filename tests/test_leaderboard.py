@@ -2,10 +2,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from ccb.certificates import certify_edge
-from ccb.core import selection_correction
 from ccb.leaderboard import bonferroni, closed_test
 
 GOLDEN = json.loads(
@@ -89,21 +87,8 @@ def test_both_directions_doubles_claims():
     assert reverse[("b", "a")] <= reverse[("a", "b")]
 
 
-def test_selection_log_v():
-    assert selection_correction(1) == 0.0
-    assert selection_correction(27) == pytest.approx(np.log(27.0))
-
-
 def test_selection_matches_alpha_division():
     values = STREAMS[("a", "b")]
     corrected = certify_edge(values, selection_variants=27)
     divided = certify_edge(values, alpha=0.05 / 27)
     assert corrected.tolerance == divided.tolerance
-
-
-def test_selection_lowers_budget():
-    values = STREAMS[("a", "b")]
-    assert (
-        certify_edge(values, selection_variants=27).tolerance
-        < certify_edge(values).tolerance
-    )

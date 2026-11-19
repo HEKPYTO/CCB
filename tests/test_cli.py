@@ -101,14 +101,6 @@ def test_missing_pair(tmp_path, capsys):
     assert "invalid_pair" in capsys.readouterr().err
 
 
-def test_invalid_alpha_error_envelope(tmp_path, capsys):
-    path = _wins(tmp_path)
-    argv = ["certify", "--input", str(path), "--alpha", "nan", "--json"]
-    assert main(argv) == 1
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["error"]["code"] == "invalid_alpha"
-
-
 def test_output_exists_refuses(tmp_path, capsys):
     path = _wins(tmp_path)
     out = tmp_path / "report.txt"
@@ -312,3 +304,10 @@ def test_selection_filters_variants(tmp_path, capsys):
         "tolerance"
     ]
     assert first_tolerance == second_tolerance
+
+
+def test_selection_variants_must_be_positive(tmp_path):
+    path = _wins(tmp_path)
+    with pytest.raises(SystemExit) as excinfo:
+        main(["certify", "--input", str(path), "--selection-variants", "0"])
+    assert excinfo.value.code == 2

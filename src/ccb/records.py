@@ -32,9 +32,8 @@ def _record(raw: dict, cache: dict) -> Record:
     raw_names = [raw["model_a"], raw["model_b"]]
     if not all(isinstance(name, str) for name in raw_names):
         raise CCBError("parse_error", "model names must be strings")
-    model_a, model_b = (
-        cache.setdefault(name.strip(), name.strip()) for name in raw_names
-    )
+    stripped = [name.strip() for name in raw_names]
+    model_a, model_b = (cache.setdefault(name, name) for name in stripped)
     if not model_a or not model_b or model_a == model_b:
         raise CCBError("invalid_pair", "model names must be non-empty and distinct")
 
@@ -117,6 +116,8 @@ def load_records(path: str | Path, fmt: str | None = None) -> list[Record]:
         records = _read_csv(path, cache) if fmt == "csv" else _read_jsonl(path, cache)
     except UnicodeDecodeError:
         raise CCBError("parse_error", "input is not valid UTF-8") from None
+    except csv.Error as exc:
+        raise CCBError("parse_error", f"csv parse error: {exc}") from None
     except OSError as exc:
         raise CCBError("io_error", f"cannot read {path}: {exc.strerror}") from None
     if not records:

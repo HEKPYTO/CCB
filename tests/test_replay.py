@@ -107,3 +107,8 @@ def test_replay_rejects_multiple_pairs(tmp_path, capsys):
     )
     assert main(["replay", "--input", str(path), "--replays", "10"]) == 1
     assert "multiple_pairs" in capsys.readouterr().err
+
+
+@pytest.mark.slow
+def test_edge_validity_burst(burst_replay):
+    assert burst_replay.rates["replacement"][100] <= 0.06

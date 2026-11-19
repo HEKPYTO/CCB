@@ -8,7 +8,7 @@ from .attacks import (
     attack_flip,
     attack_spread,
 )
-from .baselines import per_step_violation, wald_violation
+from .baselines import per_step_violation, undeflated_violation, wald_violation
 from .core import Grid, grid_costs, log_phi, log_wealth
 from .errors import CCBError, validated_outcomes
 
@@ -104,7 +104,6 @@ def replay(
         "insertion": grid_costs(grid, "insertion"),
         "replacement": grid_costs(grid, "replacement"),
     }
-    neutral = np.zeros(len(grid.lams))
     hits = {method: dict.fromkeys(budgets, 0) for method in METHODS}
 
     for _ in range(replays):
@@ -117,9 +116,7 @@ def replay(
                 paths[index] = log_wealth(observed, float(lam))
             verdicts = {
                 "wald": bool(np.any(wald_violation(observed))),
-                "naive": bool(
-                    np.any(log_phi(paths, neutral, grid.weights, 0.0) >= threshold)
-                ),
+                "naive": bool(np.any(undeflated_violation(paths, grid, alpha))),
                 "per_step": bool(
                     np.any(per_step_violation(observed, budget, records=values.size))
                 ),

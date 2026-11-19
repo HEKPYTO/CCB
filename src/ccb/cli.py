@@ -224,6 +224,8 @@ _COMMANDS = {
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    if args.command == "certify" and args.selection_variants < 1:
+        parser.error("--selection-variants must be positive")
     if args.command == "certify" and args.selection_variants > 1 and not args.variant:
         parser.error("--selection-variants > 1 requires --variant")
     if (

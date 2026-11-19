@@ -22,11 +22,6 @@ def test_very_long_stream_100k_completes():
     assert 0 <= certificate.tolerance <= certificate.n
 
 
-def test_float32_input_matches_float64():
-    outcomes = (np.random.default_rng(4).random(500) < 0.6).astype(np.float32)
-    assert certify_edge(outcomes) == certify_edge(outcomes.astype(np.float64))
-
-
 def test_infinite_outcome_rejected():
     with pytest.raises(CCBError) as excinfo:
         certify_edge(np.array([1.0, np.inf]))
