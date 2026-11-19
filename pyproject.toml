@@ -4,13 +4,21 @@ description = "Anytime-valid leaderboard claims with a certified corruption budg
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26,<3"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "zoonyanapat" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Operating System :: OS Independent",
 ]
 dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/HEKPYTO/CERTIFIED-CORRUPTION-BUDGET"
+Repository = "https://github.com/HEKPYTO/CERTIFIED-CORRUPTION-BUDGET"
 
 [project.scripts]
 ccb = "ccb.cli:main"

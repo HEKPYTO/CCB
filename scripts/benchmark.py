@@ -19,9 +19,9 @@ def _work(case):
     from ccb.leaderboard import closed_test
 
     streams = {
-        (f"m{index}", f"m{index + 1}"): (
-            np.random.default_rng(index).random(1000) < 0.55
-        ).astype(np.float64)
+        (f"m{index}", f"m{index + 1}"): np.array(
+            [float((index * 7 + t) % 10 < 6) for t in range(1000)]
+        )
         for index in range(1000)
     }
     return 1_000_000, 1000, lambda: closed_test(streams)

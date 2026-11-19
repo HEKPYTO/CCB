@@ -68,33 +68,40 @@ def _prepare(streams, alpha, cost, grid, both_directions) -> _Family:
     )
 
 
-def _closed_log_average(levels: np.ndarray, index: int) -> float:
-    others = np.sort(np.delete(levels, index))
-    prefix = np.concatenate([[-np.inf], np.logaddexp.accumulate(others)])
-    k = np.arange(prefix.size)
-    return float(np.min(np.logaddexp(levels[index], prefix) - np.log(k + 1)))
+def _closed_min(levels: np.ndarray) -> np.ndarray:
+    """Minimum closed-test average per claim at one budget, Proposition 5.6."""
+    count = levels.size
+    order = np.argsort(levels)
+    ranked = levels[order]
+    ranks = np.empty(count, dtype=np.int64)
+    ranks[order] = np.arange(count)
+    prefix = np.concatenate([[-np.inf], np.logaddexp.accumulate(ranked)])
+    k = np.arange(count)
+    with_own = np.logaddexp(levels[:, None], prefix[None, :count]) - np.log(k + 1)
+    without = prefix[None, 1:] - np.log(k + 1)
+    return np.where(k[None, :] < ranks[:, None], with_own, without).min(axis=1)
 
 
-def _budget(family: _Family, index: int, log_threshold: float) -> int:
-    def feasible(budget: int) -> bool:
-        levels = log_phi(
-            family.log_e_values,
-            family.cost_vector,
-            family.grid.weights,
-            budget,
-        )
-        return _closed_log_average(levels, index) >= log_threshold
+def _levels(family: _Family, budget: int) -> np.ndarray:
+    return log_phi(family.log_e_values, family.cost_vector, family.grid.weights, budget)
 
-    if not feasible(0):
-        return -1
-    low, high = 0, family.horizon
-    while high - low > 1:
-        middle = (low + high) // 2
-        if feasible(middle):
-            low = middle
-        else:
-            high = middle
-    return low
+
+def _closed_budgets(family: _Family, log_threshold: float) -> np.ndarray:
+    count = len(family.claims)
+    lo = np.zeros(count, dtype=np.int64)
+    hi = np.full(count, family.horizon, dtype=np.int64)
+    feasible = _closed_min(_levels(family, 0)) >= log_threshold
+    while np.any(hi - lo > 1):
+        middle = (lo + hi) // 2
+        verdict = np.zeros(count, dtype=bool)
+        for budget in np.unique(middle):
+            chosen = middle == budget
+            verdict[chosen] = (
+                _closed_min(_levels(family, int(budget)))[chosen] >= log_threshold
+            )
+        lo = np.where(verdict, middle, lo)
+        hi = np.where(verdict, hi, middle)
+    return np.where(feasible, lo, -1)
 
 
 def _results(family: _Family, tolerances, method: str) -> list[PairResult]:
@@ -129,10 +136,7 @@ def closed_test(
     if family.log_e_values is None:
         return _results(family, np.full(len(family.claims), -1), "closed")
     log_threshold = np.log(1.0 / family.alpha)
-    tolerances = [
-        _budget(family, index, log_threshold) for index in range(len(family.claims))
-    ]
-    return _results(family, tolerances, "closed")
+    return _results(family, _closed_budgets(family, log_threshold), "closed")
 
 
 def bonferroni(

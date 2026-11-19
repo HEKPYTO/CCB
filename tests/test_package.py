@@ -5,7 +5,7 @@ from ccb.cli import main
 
 def test_version(capsys):
     assert main(["version"]) == 0
-    assert capsys.readouterr().out == "ccb 0.0.0\n"
+    assert capsys.readouterr().out == "ccb 0.1.0\n"
 
 
 def test_unknown_command_exits_2():
