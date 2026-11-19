@@ -1,0 +1,4 @@
+model_a,model_b,outcome,t
+a,b,1.0,0
+a,b,0.0,1
+b,a,0.0,2

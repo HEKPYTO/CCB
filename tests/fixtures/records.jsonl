@@ -1,0 +1,3 @@
+{"model_a":"a","model_b":"b","outcome":1.0,"t":0}
+{"model_a":"a","model_b":"b","outcome":0.0,"t":1}
+{"model_a":"b","model_b":"a","outcome":0.0,"t":2}
