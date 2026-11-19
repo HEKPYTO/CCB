@@ -22,13 +22,12 @@ Local-first Python library and CLI. Edge and lead certificates, insertion and
 replacement costs, batch and streaming, selection correction, closed-testing
 and Bonferroni leaderboards, attack replays, a human table, a stable `ccb/v1`
 JSON envelope, and a self-contained HTML report are implemented and tested.
-Registry publication is pending the owner's decisions.
+Published on PyPI as `certified-corruption-budget`.
 
 ## Install
 
 ```sh
-uv build
-pip install dist/certified_corruption_budget-0.1.0-py3-none-any.whl
+pip install certified-corruption-budget
 ```
 
 Python 3.11 or newer; NumPy is the only runtime dependency.

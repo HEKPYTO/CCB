@@ -19,6 +19,7 @@ dynamic = ["version"]
 [project.urls]
 Homepage = "https://github.com/HEKPYTO/CCB"
 Repository = "https://github.com/HEKPYTO/CCB"
+PyPI = "https://pypi.org/project/certified-corruption-budget/"
 
 [project.scripts]
 ccb = "ccb.cli:main"
