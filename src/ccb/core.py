@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from math import log
 
 import numpy as np
 
-from .errors import CCBError
+from .errors import validated_alpha, validated_variants
 
 
 @dataclass(frozen=True)
@@ -15,14 +16,16 @@ class Grid:
         return cls(2.0 ** (-np.arange(n) / 2.0), np.full(n, 1.0 / n))
 
 
-def validated_outcomes(values) -> np.ndarray:
-    """Validated outcomes as finite values in [0, 1]."""
-    result = np.asarray(values, dtype=float)
-    if result.size and (
-        not np.all(np.isfinite(result)) or result.min() < 0.0 or result.max() > 1.0
-    ):
-        raise CCBError("invalid_outcome", "outcome must be finite and in [0, 1]")
-    return result
+def selection_correction(variants: int) -> float:
+    """log V correction for selecting the best of V variants, Proposition 5.5."""
+    return log(validated_variants(variants))
+
+
+def threshold(alpha: float, selection_variants: int = 1) -> float:
+    """Evidence threshold log(1/alpha) + log V, paper eq. (9)."""
+    return float(
+        log(1.0 / validated_alpha(alpha)) + selection_correction(selection_variants)
+    )
 
 
 def costs(lam: float) -> tuple[float, float]:

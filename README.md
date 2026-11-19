@@ -19,7 +19,8 @@ The product certifies one pair from a JSONL or CSV record file and prints a
 human report or a `ccb/v1` JSON envelope. Edge and lead claims, insertion and
 replacement costs, batch and streaming, and selection correction are
 implemented and checked against the reference implementation's published
-values. Leaderboard, replay, and the HTML demo are not built yet.
+values. Leaderboard claims are certified with closed testing or Bonferroni;
+the static HTML demo is not built yet.
 
 ## What it will do
 
@@ -39,13 +40,13 @@ Working now:
 ccb certify --input records.jsonl --pair model-x,model-y --claim edge --cost replacement --alpha 0.05
 ccb certify --input records.jsonl --pair model-x,model-y --json
 ccb replay  --input null.jsonl --attack flip --budget 100 --replays 1000 --json
+ccb leaderboard --input records.jsonl --method closed --cost replacement --alpha 0.05
 ```
 
 Planned:
 
 ```sh
-ccb leaderboard --input records.jsonl --alpha 0.05
-ccb demo        --input records.jsonl --out demo.html
+ccb demo --input records.jsonl --out demo.html
 ```
 
 ## Input shape

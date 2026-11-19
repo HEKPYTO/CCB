@@ -1,6 +1,6 @@
 import numpy as np
 
-from .core import validated_outcomes
+from .errors import validated_outcomes
 
 
 def _budget(budget) -> int:

@@ -9,8 +9,8 @@ from .attacks import (
     attack_spread,
 )
 from .baselines import per_step_violation, wald_violation
-from .core import Grid, grid_costs, log_phi, log_wealth, validated_outcomes
-from .errors import CCBError
+from .core import Grid, grid_costs, log_phi, log_wealth
+from .errors import CCBError, validated_outcomes
 
 METHODS = ("wald", "naive", "per_step", "insertion", "replacement")
 DEFAULT_BUDGETS = (0, 100, 400)
@@ -31,6 +31,25 @@ class ReplayResult:
     @property
     def methods(self) -> list[str]:
         return list(self.rates)
+
+    def to_dict(self) -> dict:
+        return {
+            "attack": self.attack,
+            "records": self.records,
+            "replays": self.replays,
+            "seed": self.seed,
+            "alpha": self.alpha,
+            "budgets": self.budgets,
+            "methods": self.methods,
+            "rates": {
+                method: {str(budget): rate for budget, rate in values.items()}
+                for method, values in self.rates.items()
+            },
+            "se": {
+                method: {str(budget): error for budget, error in values.items()}
+                for method, values in self.se.items()
+            },
+        }
 
 
 def _int(value, name: str, minimum: int) -> int:

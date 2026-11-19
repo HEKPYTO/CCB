@@ -11,9 +11,14 @@ from .core import (
     grid_costs,
     log_phi,
     log_wealth,
-    validated_outcomes,
+    threshold,
 )
-from .errors import CCBError
+from .errors import (
+    validated_alpha,
+    validated_cost,
+    validated_outcomes,
+    validated_variants,
+)
 
 Cost = Literal["insertion", "replacement"]
 Claim = Literal["edge", "lead"]
@@ -31,28 +36,6 @@ class Certificate:
     selection_variants: int
 
 
-def _alpha(alpha: float) -> float:
-    if not np.isfinite(alpha) or not 0.0 < alpha < 1.0:
-        raise CCBError("invalid_alpha", "alpha must be in (0, 1)")
-    return float(alpha)
-
-
-def _cost(cost: str) -> Cost:
-    if cost not in ("insertion", "replacement"):
-        raise ValueError("cost must be 'insertion' or 'replacement'")
-    return cost
-
-
-def _variants(selection_variants: int) -> int:
-    if isinstance(selection_variants, bool) or not isinstance(
-        selection_variants, (int, np.integer)
-    ):
-        raise TypeError("selection_variants must be a positive integer")
-    if selection_variants < 1:
-        raise ValueError("selection_variants must be a positive integer")
-    return int(selection_variants)
-
-
 def _certificate(
     claim: Claim,
     cost: Cost,
@@ -63,8 +46,8 @@ def _certificate(
     selection_variants: int,
     horizon: int | None = None,
 ) -> Certificate:
-    threshold = np.log(1.0 / alpha) + np.log(selection_variants)
-    path = budget_path(log_paths, cost_vector, weights, threshold, cap=horizon)
+    threshold_value = threshold(alpha, selection_variants)
+    path = budget_path(log_paths, cost_vector, weights, threshold_value, cap=horizon)
     hits = np.flatnonzero(path >= 0)
     tolerance = int(path[-1]) if path.size else -1
     probe = max(tolerance, 0)
@@ -94,9 +77,9 @@ def certify_edge(
     """Deflated capped betting, paper eq. (8)-(9), Theorem 5.1."""
     x = validated_outcomes(outcomes)
     grid = grid if grid is not None else Grid.default()
-    alpha = _alpha(alpha)
-    cost = _cost(cost)
-    variants = _variants(selection_variants)
+    alpha = validated_alpha(alpha)
+    cost = validated_cost(cost)
+    variants = validated_variants(selection_variants)
     cost_vector = grid_costs(grid, cost)
     log_paths = np.vstack([log_wealth(x, float(lam)) for lam in grid.lams])
     return _certificate(
@@ -115,9 +98,9 @@ def certify_lead(
     """Deflated exponential wealth, paper eq. (10), Theorem 5.7."""
     x = validated_outcomes(outcomes)
     grid = grid if grid is not None else Grid.default()
-    alpha = _alpha(alpha)
-    cost = _cost(cost)
-    variants = _variants(selection_variants)
+    alpha = validated_alpha(alpha)
+    cost = validated_cost(cost)
+    variants = validated_variants(selection_variants)
     index = 0 if cost == "insertion" else 1
     cost_vector = np.array([exp_costs(float(lam))[index] for lam in grid.lams])
     log_paths = np.vstack([exp_log_wealth(x, float(lam)) for lam in grid.lams])
@@ -138,9 +121,9 @@ class _StreamingCertificate:
         selection_variants: int = 1,
     ):
         self._grid = grid if grid is not None else Grid.default()
-        self._alpha = _alpha(alpha)
-        self._cost = _cost(cost)
-        self._variants = _variants(selection_variants)
+        self._alpha = validated_alpha(alpha)
+        self._cost = validated_cost(cost)
+        self._variants = validated_variants(selection_variants)
         self._log_wealth = np.zeros(len(self._grid.lams))
         self._t = 0
         self._certified_at = -1

@@ -210,3 +210,105 @@ def test_statement_uncertified_exact():
         "At alpha=0.05, no lead claim is certified for A over B on the first "
         "14858 records."
     )
+
+
+def _family(tmp_path, name="family.jsonl"):
+    path = tmp_path / name
+    lines = []
+    for index in range(20):
+        lines.append(f'{{"model_a":"a","model_b":"b","outcome":1,"t":{index}}}')
+        lines.append(f'{{"model_a":"b","model_b":"c","outcome":1,"t":{index}}}')
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def test_leaderboard_json(tmp_path, capsys):
+    path = _family(tmp_path)
+    assert main(["leaderboard", "--input", str(path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["command"] == "leaderboard"
+    assert payload["error"] is None
+    data = payload["data"]
+    assert data["method"] == "closed"
+    assert data["cost"] == "replacement"
+    assert data["alpha"] == 0.05
+    assert len(data["claims"]) == 2
+    for claim in data["claims"]:
+        assert set(claim) == {
+            "model_a",
+            "model_b",
+            "n",
+            "tolerance",
+            "certified_at",
+            "status",
+        }
+
+
+def test_leaderboard_both_directions(tmp_path, capsys):
+    path = _family(tmp_path)
+    argv = ["leaderboard", "--input", str(path), "--both-directions", "--json"]
+    assert main(argv) == 0
+    data = json.loads(capsys.readouterr().out)["data"]
+    assert len(data["claims"]) == 4
+
+
+def test_leaderboard_all_ties(tmp_path, capsys):
+    path = tmp_path / "ties.jsonl"
+    path.write_text(
+        "".join(
+            f'{{"model_a":"a","model_b":"b","outcome":0.5,"t":{index}}}\n'
+            for index in range(10)
+        )
+    )
+    assert main(["leaderboard", "--input", str(path), "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)["data"]
+    assert data["claims"][0]["tolerance"] == -1
+    assert data["claims"][0]["status"] == "not_certified"
+
+
+def test_leaderboard_human_table(tmp_path, capsys):
+    path = _family(tmp_path)
+    assert main(["leaderboard", "--input", str(path), "--cost", "insertion"]) == 0
+    out = capsys.readouterr().out
+    assert "a > b" in out
+    assert "B_ins" in out
+    assert "alpha         0.05" in out
+
+
+def test_selection_filters_variants(tmp_path, capsys):
+    base = [
+        f'{{"model_a":"a","model_b":"b","outcome":1,"variant":"v1","t":{index}}}'
+        for index in range(20)
+    ]
+    polluted = base + [
+        f'{{"model_a":"a","model_b":"b","outcome":0,"variant":"v2","t":{index}}}'
+        for index in range(20, 40)
+    ]
+    clean = base + [
+        f'{{"model_a":"a","model_b":"b","outcome":1,"variant":"v2","t":{index}}}'
+        for index in range(20, 40)
+    ]
+    first = tmp_path / "polluted.jsonl"
+    second = tmp_path / "clean.jsonl"
+    first.write_text("\n".join(polluted) + "\n")
+    second.write_text("\n".join(clean) + "\n")
+    argv = [
+        "certify",
+        "--input",
+        str(first),
+        "--variant",
+        "v1",
+        "--selection-variants",
+        "2",
+        "--json",
+    ]
+    assert main(argv) == 0
+    first_tolerance = json.loads(capsys.readouterr().out)["data"]["certificate"][
+        "tolerance"
+    ]
+    argv[2] = str(second)
+    assert main(argv) == 0
+    second_tolerance = json.loads(capsys.readouterr().out)["data"]["certificate"][
+        "tolerance"
+    ]
+    assert first_tolerance == second_tolerance

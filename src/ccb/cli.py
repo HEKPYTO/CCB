@@ -3,11 +3,19 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .certificates import Certificate, certify_edge, certify_lead
+from .certificates import certify_edge, certify_lead
 from .errors import CCBError
+from .leaderboard import bonferroni, closed_test
 from .records import load_records, pair_streams
-from .replay import DEFAULT_BUDGETS, ReplayResult, replay
-from .report import envelope, statement
+from .replay import DEFAULT_BUDGETS, replay
+from .report import (
+    certify_payload,
+    certify_text,
+    envelope,
+    leaderboard_payload,
+    leaderboard_text,
+    replay_text,
+)
 
 
 def _positive(text: str) -> int:
@@ -38,6 +46,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("version", help="print the version")
+
     certify = sub.add_parser("certify", help="certify one pair")
     certify.add_argument("--input", required=True)
     certify.add_argument("--format", choices=("jsonl", "csv"))
@@ -53,6 +62,7 @@ def _parser() -> argparse.ArgumentParser:
     certify.add_argument("--json", action="store_true")
     certify.add_argument("--out")
     certify.add_argument("--force", action="store_true")
+
     replay_cmd = sub.add_parser(
         "replay", help="replay an attack against the certificate"
     )
@@ -71,6 +81,19 @@ def _parser() -> argparse.ArgumentParser:
     replay_cmd.add_argument("--json", action="store_true")
     replay_cmd.add_argument("--out")
     replay_cmd.add_argument("--force", action="store_true")
+
+    board = sub.add_parser("leaderboard", help="certify a family of pairs")
+    board.add_argument("--input", required=True)
+    board.add_argument("--format", choices=("jsonl", "csv"))
+    board.add_argument("--method", choices=("closed", "bonferroni"), default="closed")
+    board.add_argument(
+        "--cost", choices=("insertion", "replacement"), default="replacement"
+    )
+    board.add_argument("--alpha", type=float, default=0.05)
+    board.add_argument("--both-directions", action="store_true")
+    board.add_argument("--json", action="store_true")
+    board.add_argument("--out")
+    board.add_argument("--force", action="store_true")
     return parser
 
 
@@ -89,64 +112,22 @@ def _select(streams, pair: str | None):
     raise CCBError("invalid_pair", f"pair {model_a},{model_b} not found in input")
 
 
-def _certify_command(args: argparse.Namespace) -> tuple[str, str, Certificate]:
+def _certify_command(args: argparse.Namespace) -> str:
     records = load_records(args.input, args.format)
     streams = pair_streams(records, variant=args.variant)
     model_a, model_b, outcomes = _select(streams, args.pair)
     if args.reverse_pair:
         model_a, model_b = model_b, model_a
         outcomes = 1.0 - outcomes
-    if args.claim == "lead":
-        certificate = certify_lead(
-            outcomes,
-            alpha=args.alpha,
-            cost=args.cost,
-            selection_variants=args.selection_variants,
-        )
-    else:
-        certificate = certify_edge(
-            outcomes,
-            alpha=args.alpha,
-            cost=args.cost,
-            selection_variants=args.selection_variants,
-        )
-    return model_a, model_b, certificate
-
-
-def _payload(model_a: str, model_b: str, certificate: Certificate) -> dict:
-    return {
-        "pair": [model_a, model_b],
-        "statement": statement(certificate, model_a, model_b),
-        "certificate": {
-            "claim": certificate.claim,
-            "cost": certificate.cost,
-            "alpha": certificate.alpha,
-            "n": certificate.n,
-            "tolerance": certificate.tolerance,
-            "certified_at": certificate.certified_at,
-            "selection_variants": certificate.selection_variants,
-        },
-    }
-
-
-def _render(args: argparse.Namespace, payload: dict) -> str:
-    if args.json:
-        return envelope(args.command, payload)
-    certificate = payload["certificate"]
-    label = "B_ins" if certificate["cost"] == "insertion" else "B_rep"
-    model_a, model_b = payload["pair"]
-    return "\n".join(
-        [
-            f"{'pair':<14}{model_a} > {model_b}",
-            f"{'claim':<14}{certificate['claim']}",
-            f"{'cost':<14}{certificate['cost']}",
-            f"{'alpha':<14}{certificate['alpha']:g}",
-            f"{label:<14}{certificate['tolerance']}",
-            f"{'certified_at':<14}{certificate['certified_at']}",
-            "",
-            payload["statement"],
-        ]
+    certify = certify_lead if args.claim == "lead" else certify_edge
+    certificate = certify(
+        outcomes,
+        alpha=args.alpha,
+        cost=args.cost,
+        selection_variants=args.selection_variants,
     )
+    payload = certify_payload(model_a, model_b, certificate)
+    return envelope("certify", payload) if args.json else certify_text(payload)
 
 
 def _replay_command(args: argparse.Namespace) -> str:
@@ -154,61 +135,30 @@ def _replay_command(args: argparse.Namespace) -> str:
     streams = pair_streams(records)
     if len(streams) != 1:
         raise CCBError("multiple_pairs", "replay needs a single pair")
-    stream = next(iter(streams.values()))
     budgets = [args.budget] if args.budget is not None else args.budgets
     result = replay(
-        stream,
+        next(iter(streams.values())),
         attack=args.attack,
         budgets=budgets if budgets is not None else DEFAULT_BUDGETS,
         replays=args.replays,
         seed=args.seed,
         alpha=args.alpha,
     )
-    if args.json:
-        return envelope("replay", _replay_payload(result))
-    return _replay_table(result)
+    payload = result.to_dict()
+    return envelope("replay", payload) if args.json else replay_text(payload)
 
 
-def _replay_payload(result: ReplayResult) -> dict:
-    return {
-        "attack": result.attack,
-        "records": result.records,
-        "replays": result.replays,
-        "seed": result.seed,
-        "alpha": result.alpha,
-        "budgets": result.budgets,
-        "methods": result.methods,
-        "rates": {
-            method: {str(budget): rate for budget, rate in values.items()}
-            for method, values in result.rates.items()
-        },
-        "se": {
-            method: {str(budget): error for budget, error in values.items()}
-            for method, values in result.se.items()
-        },
-    }
-
-
-def _replay_table(result: ReplayResult) -> str:
-    header = f"{'method':<14}" + "".join(f"B={budget:<9}" for budget in result.budgets)
-    rows = [header]
-    for method, values in result.rates.items():
-        rows.append(
-            f"{method:<14}"
-            + "".join(f"{values[budget]:<11.4f}" for budget in result.budgets)
-        )
-    meta = [
-        f"{'attack':<14}{result.attack}",
-        f"{'records':<14}{result.records}",
-        f"{'replays':<14}{result.replays}",
-        f"{'seed':<14}{result.seed}",
-        f"{'alpha':<14}{result.alpha:g}",
-    ]
-    caution = (
-        "Rates estimate the false-statement probability only when the "
-        "uncorrupted claim is false."
+def _leaderboard_command(args: argparse.Namespace) -> str:
+    records = load_records(args.input, args.format)
+    certify = closed_test if args.method == "closed" else bonferroni
+    results = certify(
+        pair_streams(records),
+        alpha=args.alpha,
+        cost=args.cost,
+        both_directions=args.both_directions,
     )
-    return "\n".join([*meta, "", *rows, "", caution])
+    payload = leaderboard_payload(results, args.method, args.cost, args.alpha)
+    return envelope("leaderboard", payload) if args.json else leaderboard_text(payload)
 
 
 def _write(text: str, args: argparse.Namespace) -> None:
@@ -232,6 +182,13 @@ def _fail(args: argparse.Namespace, error: CCBError) -> None:
         print(f"error: {error.code}: {error.message}", file=sys.stderr)
 
 
+_COMMANDS = {
+    "certify": _certify_command,
+    "replay": _replay_command,
+    "leaderboard": _leaderboard_command,
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
@@ -247,11 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ccb {__version__}")
         return 0
     try:
-        if args.command == "replay":
-            _write(_replay_command(args), args)
-        else:
-            model_a, model_b, certificate = _certify_command(args)
-            _write(_render(args, _payload(model_a, model_b, certificate)), args)
+        _write(_COMMANDS[args.command](args), args)
     except CCBError as error:
         _fail(args, error)
         return 1

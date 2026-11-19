@@ -1,7 +1,7 @@
 import numpy as np
 
-from .core import Grid, log_phi, log_wealth, validated_outcomes
-from .errors import CCBError
+from .core import Grid, log_phi, log_wealth
+from .errors import CCBError, validated_outcomes
 
 
 def wald_violation(observed, every: int = 50) -> np.ndarray:
