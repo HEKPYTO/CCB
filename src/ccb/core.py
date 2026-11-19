@@ -41,6 +41,12 @@ def log_wealth(outcomes: np.ndarray, lam: float) -> np.ndarray:
     return np.cumsum(np.log1p(lam * (np.asarray(outcomes, dtype=float) - 0.5)))
 
 
+def log_wealth_final(outcomes, lam: float) -> float:
+    """Final capped-bet log wealth without the path, paper eq. (5)."""
+    values = np.asarray(outcomes, dtype=float)
+    return float(np.log1p(lam * (values - 0.5)).sum())
+
+
 def exp_costs(gamma: float) -> tuple[float, float]:
     """Insertion and replacement cost for the exponential wealth, paper eq. (10)."""
     return gamma / 2.0 - gamma**2 / 8.0, gamma
@@ -64,10 +70,8 @@ def log_phi(
     budget,
 ) -> np.ndarray:
     """Deflated average wealth, paper eq. (8); budget may be a scalar or per-t."""
-    return np.logaddexp.reduce(
-        np.log(weights)[:, None] + log_paths - budget * cost_vector[:, None],
-        axis=0,
-    )
+    offset = np.log(weights)[:, None] - budget * cost_vector[:, None]
+    return np.logaddexp.reduce(log_paths + offset, axis=0)
 
 
 def budget_path(
@@ -91,3 +95,30 @@ def budget_path(
         lo = np.where(ok, mid, lo)
         hi = np.where(ok, hi, mid)
     return np.where(feasible, lo, -1)
+
+
+def budget_at(
+    log_levels: np.ndarray,
+    cost_vector: np.ndarray,
+    weights: np.ndarray,
+    threshold_value: float,
+    cap: int,
+) -> int:
+    """Largest integer budget at one time point, paper eq. (9)."""
+    levels = log_levels[:, None]
+
+    def feasible(budget: int) -> bool:
+        return (
+            float(log_phi(levels, cost_vector, weights, budget)[0]) >= threshold_value
+        )
+
+    if not feasible(0):
+        return -1
+    low, high = 0, cap
+    while high - low > 1:
+        middle = (low + high) // 2
+        if feasible(middle):
+            low = middle
+        else:
+            high = middle
+    return low
