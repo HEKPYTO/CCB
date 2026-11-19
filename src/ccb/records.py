@@ -12,7 +12,7 @@ FIELDS = ("model_a", "model_b", "outcome")
 OPTIONAL = ("t", "variant")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Record:
     model_a: str
     model_b: str
@@ -21,7 +21,7 @@ class Record:
     variant: str | None = None
 
 
-def _record(raw: dict) -> Record:
+def _record(raw: dict, cache: dict) -> Record:
     missing = [field for field in FIELDS if field not in raw]
     if missing:
         raise CCBError("parse_error", f"missing field: {missing[0]}")
@@ -29,10 +29,12 @@ def _record(raw: dict) -> Record:
     if extra:
         raise CCBError("parse_error", f"unknown field: {min(extra)}")
 
-    names = [raw["model_a"], raw["model_b"]]
-    if not all(isinstance(name, str) for name in names):
+    raw_names = [raw["model_a"], raw["model_b"]]
+    if not all(isinstance(name, str) for name in raw_names):
         raise CCBError("parse_error", "model names must be strings")
-    model_a, model_b = (name.strip() for name in names)
+    model_a, model_b = (
+        cache.setdefault(name.strip(), name.strip()) for name in raw_names
+    )
     if not model_a or not model_b or model_a == model_b:
         raise CCBError("invalid_pair", "model names must be non-empty and distinct")
 
@@ -73,33 +75,35 @@ def _from_csv(raw: dict) -> dict:
     return row
 
 
-def _read_jsonl(text: str) -> list[Record]:
+def _read_jsonl(path: Path, cache: dict) -> list[Record]:
     records = []
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        try:
-            raw = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise CCBError("parse_error", f"invalid JSON: {exc.msg}") from None
-        if not isinstance(raw, dict):
-            raise CCBError("parse_error", "each line must be a JSON object")
-        records.append(_record(raw))
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                raw = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise CCBError("parse_error", f"invalid JSON: {exc.msg}") from None
+            if not isinstance(raw, dict):
+                raise CCBError("parse_error", "each line must be a JSON object")
+            records.append(_record(raw, cache))
     return records
 
 
-def _read_csv(text: str) -> list[Record]:
-    reader = csv.DictReader(text.splitlines())
-    header = reader.fieldnames or []
-    missing = [field for field in FIELDS if field not in header]
-    if missing:
-        raise CCBError("parse_error", f"missing column: {missing[0]}")
-    extra = set(header) - set(FIELDS) - set(OPTIONAL)
-    if extra:
-        raise CCBError("parse_error", f"unknown column: {min(extra)}")
+def _read_csv(path: Path, cache: dict) -> list[Record]:
     records = []
-    for raw in reader:
-        records.append(_record(_from_csv(raw)))
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        header = reader.fieldnames or []
+        missing = [field for field in FIELDS if field not in header]
+        if missing:
+            raise CCBError("parse_error", f"missing column: {missing[0]}")
+        extra = set(header) - set(FIELDS) - set(OPTIONAL)
+        if extra:
+            raise CCBError("parse_error", f"unknown column: {min(extra)}")
+        for raw in reader:
+            records.append(_record(_from_csv(raw), cache))
     return records
 
 
@@ -108,11 +112,13 @@ def load_records(path: str | Path, fmt: str | None = None) -> list[Record]:
     fmt = fmt or {".jsonl": "jsonl", ".csv": "csv"}.get(path.suffix.lower())
     if fmt not in ("jsonl", "csv"):
         raise CCBError("unknown_format", "format must be jsonl or csv")
+    cache: dict[str, str] = {}
     try:
-        text = path.read_text(encoding="utf-8")
+        records = _read_csv(path, cache) if fmt == "csv" else _read_jsonl(path, cache)
+    except UnicodeDecodeError:
+        raise CCBError("parse_error", "input is not valid UTF-8") from None
     except OSError as exc:
         raise CCBError("io_error", f"cannot read {path}: {exc.strerror}") from None
-    records = _read_csv(text) if fmt == "csv" else _read_jsonl(text)
     if not records:
         raise CCBError("empty_input", "no records")
     timed = [record.t is not None for record in records]

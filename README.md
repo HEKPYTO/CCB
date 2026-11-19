@@ -25,7 +25,7 @@ Registry publication is pending the owner's decisions.
 
 ```sh
 uv build
-pip install dist/certified_corruption_budget-0.0.0-py3-none-any.whl
+pip install dist/certified_corruption_budget-0.1.0-py3-none-any.whl
 ```
 
 Python 3.11 or newer; NumPy is the only runtime dependency.
@@ -57,11 +57,11 @@ At alpha=0.05, the edge claim that model-x has had an advantage over model-y hol
 ## CLI
 
 ```sh
-ccb certify     --input records.jsonl --pair model-x,model-y --claim edge --cost replacement --alpha 0.05
-ccb certify     --input records.jsonl --pair model-x,model-y --json
-ccb leaderboard --input records.jsonl --method closed --cost replacement --alpha 0.05
-ccb replay      --input null.jsonl --attack flip --budget 100 --replays 1000 --json
-ccb demo        --input records.jsonl --out demo.html
+ccb certify     --input examples/records.jsonl --pair a,b --claim edge --cost replacement --alpha 0.05
+ccb certify     --input examples/records.jsonl --pair a,b --json
+ccb leaderboard --input examples/records.jsonl --method closed --cost replacement --alpha 0.05
+ccb replay      --input examples/null.jsonl --attack flip --budget 100 --replays 1000 --json
+ccb demo        --input examples/records.jsonl --out demo.html
 ccb version
 ```
 
