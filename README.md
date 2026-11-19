@@ -88,10 +88,22 @@ CSV header.
   the rates are meaningful only when the uncorrupted claim is false.
 - A leaderboard is a snapshot at the shortest input stream. There is no
   streaming update of a published leaderboard.
+- A `-1` budget means no certificate was issued at the chosen `alpha`; it is
+  not evidence against the claim.
+- The guarantee assumes `alpha`, the horizon, the corruption cost, the pair
+  set, and the variant count were fixed before the data was seen. Choices made
+  after looking at the data need their own correction.
 - Local files only. There is no hosted ingestion, account, or database.
 - The paper is a preprint; the implementation is not peer reviewed.
 
+## Security and contributing
+
+Report vulnerabilities through a GitHub security advisory, not a public issue.
+
+Development: `uv sync`, then `uv run pytest` and `uv run ruff check .`. A change
+to a certificate or leaderboard formula needs a proof or a citation to the
+paper; name the section in the function docstring.
+
 ## Licence
 
-MIT is the recommended licence; the reference implementation is MIT. The owner
-must confirm before a `LICENSE` file is added or anything is published.
+MIT (see `LICENSE`).
