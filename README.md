@@ -13,6 +13,9 @@ This is a product implementation of:
 > Leaderboard Claims under Adaptive Rigging*, arXiv:2610.10597, 2026.
 > https://arxiv.org/abs/2610.10597
 
+This is an independent implementation. It is not affiliated with, endorsed by,
+or reviewed by the paper's authors.
+
 ## Status
 
 Local-first Python library and CLI. Edge and lead certificates, insertion and
