@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .core import Grid, budget_path, grid_costs, log_phi, log_wealth
+from .core import Grid, budget_path, grid_costs, log_phi, log_wealth_final
 from .errors import CCBError, validated_alpha, validated_cost, validated_outcomes
 
 
@@ -53,7 +53,7 @@ def _prepare(streams, alpha, cost, grid, both_directions) -> _Family:
     else:
         log_e_values = np.array(
             [
-                [log_wealth(values[:horizon], float(lam))[-1] for lam in grid.lams]
+                [log_wealth_final(values[:horizon], float(lam)) for lam in grid.lams]
                 for _, _, values in claims
             ]
         ).T

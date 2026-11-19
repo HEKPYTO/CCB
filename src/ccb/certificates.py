@@ -5,7 +5,7 @@ import numpy as np
 
 from .core import (
     Grid,
-    budget_path,
+    budget_at,
     exp_costs,
     exp_log_wealth,
     grid_costs,
@@ -36,6 +36,14 @@ class Certificate:
     selection_variants: int
 
 
+def _paths(outcomes, lams, *, exponential: bool) -> np.ndarray:
+    builder = exp_log_wealth if exponential else log_wealth
+    paths = np.empty((lams.size, outcomes.size))
+    for index, lam in enumerate(lams):
+        paths[index] = builder(outcomes, float(lam))
+    return paths
+
+
 def _certificate(
     claim: Claim,
     cost: Cost,
@@ -47,18 +55,24 @@ def _certificate(
     horizon: int | None = None,
 ) -> Certificate:
     threshold_value = threshold(alpha, selection_variants)
-    path = budget_path(log_paths, cost_vector, weights, threshold_value, cap=horizon)
-    hits = np.flatnonzero(path >= 0)
-    tolerance = int(path[-1]) if path.size else -1
-    probe = max(tolerance, 0)
+    live = log_phi(log_paths, cost_vector, weights, 0.0) >= threshold_value
+    hits = np.flatnonzero(live)
+    n = int(log_paths.shape[1]) if horizon is None else horizon
+    tolerance = -1
+    if live.size and live[-1]:
+        tolerance = budget_at(
+            log_paths[:, -1], cost_vector, weights, threshold_value, n
+        )
     log_e_value = (
-        float(log_phi(log_paths, cost_vector, weights, probe)[-1]) if path.size else 0.0
+        float(log_phi(log_paths[:, -1:], cost_vector, weights, max(tolerance, 0))[0])
+        if log_paths.shape[1]
+        else 0.0
     )
     return Certificate(
         claim=claim,
         cost=cost,
         alpha=alpha,
-        n=int(log_paths.shape[1]) if horizon is None else horizon,
+        n=n,
         tolerance=tolerance,
         certified_at=int(hits[0]) + 1 if hits.size else -1,
         log_e_value=log_e_value,
@@ -103,7 +117,7 @@ def certify_lead(
     variants = validated_variants(selection_variants)
     index = 0 if cost == "insertion" else 1
     cost_vector = np.array([exp_costs(float(lam))[index] for lam in grid.lams])
-    log_paths = np.vstack([exp_log_wealth(x, float(lam)) for lam in grid.lams])
+    log_paths = _paths(x, grid.lams, exponential=True)
     return _certificate(
         "lead", cost, alpha, grid.weights, cost_vector, log_paths, variants
     )

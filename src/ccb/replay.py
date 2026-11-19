@@ -112,7 +112,9 @@ def replay(
         for budget in budgets:
             observed, flags = _attack(base, attack, budget, rng)
             corruptions = np.cumsum(flags)
-            paths = np.vstack([log_wealth(observed, float(lam)) for lam in grid.lams])
+            paths = np.empty((len(grid.lams), observed.size))
+            for index, lam in enumerate(grid.lams):
+                paths[index] = log_wealth(observed, float(lam))
             verdicts = {
                 "wald": bool(np.any(wald_violation(observed))),
                 "naive": bool(
